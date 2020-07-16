@@ -22,6 +22,8 @@ const (
 	namespace = "nvidia_gpu"
 )
 
+var labels = []string{"gpu_node", "namepace_name", "gpu_pod_name", "minor_number", "uuid", "name"}
+
 type Collector struct {
 	sync.Mutex
 	Chelper helper.ContainerHelper
@@ -36,8 +38,6 @@ type Collector struct {
 	freeMemory            *prometheus.GaugeVec
 	gpuUtilizationRate    *prometheus.GaugeVec
 }
-
-var labels = []string{"gpu_node", "namepace_name", "gpu_pod_name", "minor_number", "uuid", "name"}
 
 func NewCollector(cHelper helper.ContainerHelper) *Collector {
 	return &Collector{
