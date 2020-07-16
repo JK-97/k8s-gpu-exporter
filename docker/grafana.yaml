@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monitoring-grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      k8s-app: grafana
+  template:
+    metadata:
+      labels:
+        k8s-app: grafana
+        task: monitoring
+    spec:
+      containers:
+      - name: grafana
+        image: registry.cn-hangzhou.aliyuncs.com/acs/grafana:5.0.4-gpu-monitoring
+        ports:
+        - containerPort: 3000
+          protocol: TCP
+      volumes:
+      - name: grafana-storage
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: monitoring-grafana
+spec:
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: LoadBalancer
+  selector:
+    k8s-app: grafana
