@@ -48,6 +48,7 @@ func (o *PidBindDocker) SetPodUid(uid string) error {
 // check interface impelement
 var _ PidPraseOut = new(PidBindDocker)
 
+// PidBindK8sPod Parse output vector
 type PidBindK8sPod struct {
 	dockerUid string
 	podUid    string
@@ -74,6 +75,7 @@ func (o *PidBindK8sPod) SetDockerUid(uid string) error {
 // check interface impelement
 var _ PidPraseOut = new(PidBindK8sPod)
 
+//Phelper Register ProcPraseFunc and prase process's pid
 type Phelper struct {
 	ProcHelper
 	pid    uint
@@ -168,6 +170,7 @@ func (p *Phelper) PraseProc() (PidPraseOut, error) {
 // check interface impelement
 var _ ProcHelper = new(Phelper)
 
+// CHelper Get container or pod information
 type CHelper struct {
 	ContainerHelper
 	KClient  *kubernetes.Clientset
@@ -236,6 +239,7 @@ func (c *CHelper) GetK8sPods(processesInfo []*nvml.ProcessInfo) ([]*PodGPUInfo, 
 	return nil, nil
 }
 
+// TODO: Implement Get Containers
 func (c *CHelper) GetContainers(processInfo []*nvml.ProcessInfo) ([]*types.Container, error) {
 	return nil, nil
 }

@@ -18,7 +18,6 @@
 ## Best Practices
 ```bash
 # First
-
 $ kubectl apply -f k8s-gpu-exporter.yaml
 
 # Second
