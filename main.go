@@ -23,7 +23,7 @@ import (
 
 var (
 	addr       = flag.String("address", ":9445", "Address to listen on for web interface and telemetry.")
-	kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file, default get config from pod binding ServiceAccount.")
 )
 
 func init() {

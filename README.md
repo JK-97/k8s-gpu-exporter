@@ -1,19 +1,21 @@
 # k8s-gpu-exporter
 
+## Command flags
+ - `address` : Address to listen on for web interface and telemetry.
+ - `kubeconfig` : Absolute path to the kubeconfig file, default get config from pod binding ServiceAccount.
+
 ## Docker Build
 1. Find out the `libnvidia-ml.so` on you host.
     ```shell
     find /usr/ -name libnvidia-ml.so 
     ```
+    
 2. Copy the `libnvidia-ml.so` under `project-dir/lib` directory
 
 3. Run MakeFile
     ```shell
     make docker 
     ```
-
-
-
 
 ## Best Practices
 ```bash
