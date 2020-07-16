@@ -1,0 +1,21 @@
+FROM golang as build-env
+RUN go env -w GOPROXY=https://goproxy.cn,direct
+RUN go env -w GOPRIVATE=*.gitlab.com,*.gitee.com
+RUN go env -w GOSUMDB=off
+RUN go env -w CGO_ENABLED=1
+RUN go env -w GOSUMDB="sum.golang.google.cn"
+RUN go env -w GO111MODULE=on
+
+COPY lib/nvml.h /usr/include/nvml.h
+COPY . /build
+WORKDIR /build
+RUN  go build -o k8s-gpu-exporter && chmod +x k8s-gpu-exporter 
+
+FROM ubuntu
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=utility
+EXPOSE 9445
+COPY --from=build-env /build/k8s-gpu-exporter /app/k8s-gpu-exporter
+COPY lib/libnvidia-ml.so /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
+RUN ln -s /app/k8s-gpu-exporter /usr/bin/k8s-gpu-exporter
+CMD ["k8s-gpu-exporter"]

@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter
+  namespace: default
+
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8s-gpu-exporter
+  labels:
+    k8s-app: k8s-gpu-exporter
+spec:
+  ports:
+  - port: 9445
+    targetPort: 9445
+  type: LoadBalancer
+  selector:
+    k8s-app: k8s-gpu-exporter
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter-certs
+  namespace: default
+type: Opaque
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter-csrf
+  namespace: default
+type: Opaque
+data:
+  csrf: ""
+
+---
+
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter-key-holder
+  namespace: default
+type: Opaque
+
+---
+
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter-settings
+  namespace: default
+
+---
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name:  k8s-gpu-exporter
+  labels:
+    k8s-app: k8s-gpu-exporter
+spec:
+  volumes:
+  selector:
+    matchLabels:
+      k8s-app:  k8s-gpu-exporter
+  template:
+    metadata:
+      labels:
+        k8s-app:  k8s-gpu-exporter
+    spec:
+      serviceAccountName: k8s-gpu-exporter
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+                - key: k8s-node/nvidia_count
+                  operator: Exists
+      hostPID: true
+      containers:
+      - name:  k8s-gpu-exporter
+        image: k8s-gpu-exporter:v1.0.0
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        volumeMounts:
+        - name: dockersock
+          mountPath: /var/run/docker.sock
+        # resources:
+        #   requests:
+        #     memory: 30Mi
+        #     cpu: 100m
+        #   limits:
+        #     memory: 50Mi
+        #     cpu: 200m
+      volumes:
+      - name: dockersock
+        hostPath:
+          path: /var/run/docker.sock
+
+---
+
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter
+rules:
+  # Allow Dashboard to get, update and delete Dashboard exclusive secrets.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["k8s-gpu-exporter-key-holder", "k8s-gpu-exporter-certs", "k8s-gpu-exporter-csrf"]
+    verbs: ["get", "update", "delete"]
+    # Allow Dashboard to get and update 'k8s-gpu-exporter-settings' config map.
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["k8s-gpu-exporter-settings"]
+    verbs: ["get", "update"]
+    # Allow Dashboard to get metrics.
+  - apiGroups: [""]
+    resources: ["services"]
+    resourceNames: ["heapster", "dashboard-metrics-scraper"]
+    verbs: ["proxy"]
+  - apiGroups: [""]
+    resources: ["services/proxy"]
+    resourceNames: ["heapster", "http:heapster:", "https:heapster:", "dashboard-metrics-scraper", "http:dashboard-metrics-scraper"]
+    verbs: ["get"]
+
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter
+rules:
+  # Allow Metrics Scraper to get metrics from the Metrics server
+  - apiGroups: [""]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter
+  namespace: default
+  annotations:
+    rbac.authorization.kubernetes.io/autoupdate: "true"
+roleRef:
+  kind: ClusterRole
+  name: k8s-gpu-exporter
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+- kind: ServiceAccount
+  name: k8s-gpu-exporter
+  namespace: default
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  labels:
+    k8s-app: k8s-gpu-exporter
+  name: k8s-gpu-exporter
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: k8s-gpu-exporter
+subjects:
+  - kind: ServiceAccount
+    name: k8s-gpu-exporter
+    namespace: default
