@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"strconv"
@@ -12,9 +11,6 @@ import (
 	"github.com/JK-97/k8s-gpu-exporter/helper"
 
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"tkestack.io/nvml"
 )
 
@@ -254,41 +250,4 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.freeMemory.Describe(ch)
 	c.usedMemory.Describe(ch)
 	c.gpuUtilizationRate.Describe(ch)
-}
-
-func K8s() {
-	var kubeconfig *string
-	kubeconfig = flag.String("kubeconfig", "/home/dev/.kube/config", "absolute path to the kubeconfig file")
-	flag.Parse()
-
-	//在 kubeconfig 中使用当前上下文环境，config 获取支持 url 和 path 方式
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// 根据指定的 config 创建一个新的 clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{
-		FieldSelector: "spec.nodeName=dev-ms-7c22",
-	})
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("There are %d pods in the k8s cluster\n", len(pods.Items))
-	for _, pod := range pods.Items {
-		fmt.Printf("pod: %s ,namespace : %s, clusterName %s,id %s \n", pod.Name, pod.Namespace, pod.UID)
-		// if pod.Spec.NodeName != "dev-ms-7c22" {
-		// 	continue
-		// }
-
-		for _, c := range pod.Status.ContainerStatuses {
-			fmt.Printf("       %s \n", c.ContainerID)
-			fmt.Println(pod.Status.HostIP)
-		}
-		// for _, c := range pod.Spec.Containers {
-		// 	fmt.Printf("       %s \n", c.String())
-		// }
-	}
-
 }
