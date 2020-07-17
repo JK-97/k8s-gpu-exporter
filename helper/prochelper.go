@@ -203,18 +203,18 @@ var _ ProcHelper = new(Phelper)
 // CHelper Get container or pod information
 type CHelper struct {
 	ContainerHelper
-	KClient  *kubernetes.Clientset
-	PraseFuc ProcPraseFunc
+	KClient   *kubernetes.Clientset
+	PraseFunc ProcPraseFunc
 }
 type CHelperOps struct {
-	KClient  *kubernetes.Clientset
-	PraseFuc ProcPraseFunc
+	KClient   *kubernetes.Clientset
+	PraseFunc ProcPraseFunc
 }
 
 func NewCHepler(ops *CHelperOps) *CHelper {
 	return &CHelper{
-		KClient:  ops.KClient,
-		PraseFuc: ops.PraseFuc,
+		KClient:   ops.KClient,
+		PraseFunc: ops.PraseFunc,
 	}
 }
 
@@ -243,7 +243,7 @@ func (c *CHelper) GetK8sPods(processesInfo []*nvml.ProcessInfo) ([]*PodGPUInfo, 
 	}
 	res := make([]*PodGPUInfo, 0)
 	for _, pi := range processesInfo {
-		ph := NewPhelper(pi.Pid, PhelperOpts{PraseFunc: c.PraseFuc})
+		ph := NewPhelper(pi.Pid, PhelperOpts{PraseFunc: c.PraseFunc})
 		out, err := ph.PraseProc()
 		if err != nil {
 			return nil, err

@@ -60,7 +60,7 @@ func main() {
 	}
 	cHelper := helper.NewCHepler(&helper.CHelperOps{
 		KClient:  clientset,
-		PraseFuc: helper.DefaultProcPraserFunc,
+		PraseFunc: helper.DefaultProcPraserFunc,
 	})
 
 	prometheus.MustRegister(collector.NewCollector(cHelper))
