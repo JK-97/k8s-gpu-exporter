@@ -18,6 +18,8 @@
     ```
 
 ## Best Practices
+
+If you already have [Arena](https://github.com/kubeflow/arena), use it to submit a training task.
 ```bash
 # First
 $ kubectl apply -f k8s-gpu-exporter.yaml
@@ -58,3 +60,32 @@ $ kubectl logs {your-k8s-gpu-exporter-pod}
                     pid: 3598, usedMemory: 89128960 
                     node: dev-ms-7c22 pod: style-transfer-worker-0, pid: 3598 usedMemory: 89128960 
 ```
+
+
+
+### Prometheus
+##### Scrape_configs
+Add k8s-gpu-exporter in prometheus auto discover
+```yaml
+  prometheus.yml: |
+    global:
+      scrape_interval:     15s
+      evaluation_interval: 15s
+    scrape_configs:
+    - job_name: 'gpu-pod'
+      kubernetes_sd_configs:
+      - role: service
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(k8s-gpu-exporter)
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+        action: keep
+        regex: default;k8s-gpu-exporter
+
+```
+
+And you use PromQL query statement `nvidia_gpu_used_memory/nvidia_gpu_total_memory` to see gpu memory usage
+
+
+![gpu_memory_usage](.github/image/gpu_memory_usage.png)
+
