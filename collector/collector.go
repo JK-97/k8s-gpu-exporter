@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"strconv"
@@ -12,9 +11,6 @@ import (
 	"github.com/JK-97/k8s-gpu-exporter/helper"
 
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
 	"tkestack.io/nvml"
 )
 
@@ -22,7 +18,7 @@ const (
 	namespace = "nvidia_gpu"
 )
 
-var labels = []string{"gpu_node", "namepace_name", "gpu_pod_name", "minor_number", "uuid", "name"}
+var labels = []string{"gpu_node", "namepace_name", "gpu_pod_name", "gpu_pod_id", "gpu_device_minor_number", "gpu_device_id", "gpu_device_name"}
 
 type Collector struct {
 	sync.Mutex
@@ -179,25 +175,26 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 			continue
 		}
 
+		// GPU memory
+		freeMemory, usedMemory, totalMemory, err := dev.DeviceGetMemoryInfo()
+		if err != nil {
+			log.Printf("DeviceGetMemoryInfo() error: %v", err)
+		} else {
+			c.usedMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(usedMemory))
+			c.totalMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(totalMemory))
+			c.freeMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(freeMemory))
+		}
+
 		// Pod GPU
 		podGPUProcessInfos, err := c.Chelper.GetK8sPods(processes)
 		if err != nil {
 			log.Printf("GetK8sPods() error: %v", err)
 		} else {
 			for _, podInfo := range podGPUProcessInfos {
-				c.usedMemory.WithLabelValues(viper.GetString("NODE_NAME"), podInfo.Pod.Namespace, podInfo.Pod.Name, minor, uuid, name).Set(float64(podInfo.ProcessInfo.UsedGPUMemory))
+				c.usedMemory.WithLabelValues(viper.GetString("NODE_NAME"), podInfo.Pod.Namespace, podInfo.Pod.Name, string(podInfo.Pod.UID), minor, uuid, name).Set(float64(podInfo.ProcessInfo.UsedGPUMemory))
+				c.totalMemory.WithLabelValues(viper.GetString("NODE_NAME"), podInfo.Pod.Namespace, podInfo.Pod.Name, string(podInfo.Pod.UID), minor, uuid, name).Set(float64(totalMemory))
 				fmt.Printf("\t\tnode: %s pod: %s, pid: %d usedMemory: %d \n", viper.GetString("NODE_NAME"), podInfo.Pod.Name, podInfo.ProcessInfo.Pid, podInfo.ProcessInfo.UsedGPUMemory)
 			}
-		}
-
-		// GPU memory
-		freeMemory, usedMemory, totalMemory, err := dev.DeviceGetMemoryInfo()
-		if err != nil {
-			log.Printf("DeviceGetMemoryInfo() error: %v", err)
-		} else {
-			c.usedMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(usedMemory))
-			c.totalMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(totalMemory))
-			c.freeMemory.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(freeMemory))
 		}
 
 		// GPU fanspeed
@@ -205,7 +202,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			log.Printf("DeviceGetFanSpeed() error: %v", err)
 		} else {
-			c.fanSpeed.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(fanSpeed))
+			c.fanSpeed.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(fanSpeed))
 		}
 
 		// GPU temperature
@@ -213,7 +210,7 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			log.Printf("DeviceGetTemperature() error: %v", err)
 		} else {
-			c.temperature.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(temperature))
+			c.temperature.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(temperature))
 		}
 
 		// GPU powerUsage
@@ -221,15 +218,15 @@ func (c *Collector) Collect(ch chan<- prometheus.Metric) {
 		if err != nil {
 			log.Printf("DeviceGetPowerUsage() error: %v", err)
 		} else {
-			c.powerUsage.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(powerUsage))
+			c.powerUsage.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(powerUsage))
 		}
 		// GPU utilization
 		utilization, err := dev.DeviceGetUtilizationRates()
 		if err != nil {
 			log.Printf("DeviceGetUtilizationRates() error: %v", err)
 		} else {
-			c.gpuUtilizationRate.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(utilization.GPU))
-			c.memoryUtilizationRate.WithLabelValues(viper.GetString("NODE_NAME"), "", "", minor, uuid, name).Set(float64(utilization.Memory))
+			c.gpuUtilizationRate.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(utilization.GPU))
+			c.memoryUtilizationRate.WithLabelValues(viper.GetString("NODE_NAME"), "", "", "", minor, uuid, name).Set(float64(utilization.Memory))
 		}
 
 	}
@@ -254,41 +251,4 @@ func (c *Collector) Describe(ch chan<- *prometheus.Desc) {
 	c.freeMemory.Describe(ch)
 	c.usedMemory.Describe(ch)
 	c.gpuUtilizationRate.Describe(ch)
-}
-
-func K8s() {
-	var kubeconfig *string
-	kubeconfig = flag.String("kubeconfig", "/home/dev/.kube/config", "absolute path to the kubeconfig file")
-	flag.Parse()
-
-	//在 kubeconfig 中使用当前上下文环境，config 获取支持 url 和 path 方式
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	// 根据指定的 config 创建一个新的 clientset
-	clientset, err := kubernetes.NewForConfig(config)
-	pods, err := clientset.CoreV1().Pods("").List(metav1.ListOptions{
-		FieldSelector: "spec.nodeName=dev-ms-7c22",
-	})
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Printf("There are %d pods in the k8s cluster\n", len(pods.Items))
-	for _, pod := range pods.Items {
-		fmt.Printf("pod: %s ,namespace : %s, clusterName %s,id %s \n", pod.Name, pod.Namespace, pod.UID)
-		// if pod.Spec.NodeName != "dev-ms-7c22" {
-		// 	continue
-		// }
-
-		for _, c := range pod.Status.ContainerStatuses {
-			fmt.Printf("       %s \n", c.ContainerID)
-			fmt.Println(pod.Status.HostIP)
-		}
-		// for _, c := range pod.Spec.Containers {
-		// 	fmt.Printf("       %s \n", c.String())
-		// }
-	}
-
 }

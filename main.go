@@ -28,8 +28,8 @@ var (
 
 func init() {
 	if err := nvml.Init(); err != nil {
-		fmt.Printf("nvml error: %+v", err)
-		return
+		fmt.Printf("nvml error: %+v\n", err)
+		panic(err)
 	}
 	err := viper.BindEnv("NODE_NAME")
 	if err != nil {
@@ -60,7 +60,7 @@ func main() {
 	}
 	cHelper := helper.NewCHepler(&helper.CHelperOps{
 		KClient:  clientset,
-		PraseFuc: helper.DefaultProcPraserFunc,
+		PraseFunc: helper.DefaultProcPraserFunc,
 	})
 
 	prometheus.MustRegister(collector.NewCollector(cHelper))

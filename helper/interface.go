@@ -27,6 +27,25 @@ func (t ProcType) string() string {
 	}
 }
 
+type Release int
+
+const (
+	UNKNOW Release = iota
+	UBUNTU
+	CENTOS
+)
+
+func (t Release) string() string {
+	switch t {
+	case UBUNTU:
+		return "UBUNTU"
+	case CENTOS:
+		return "CENTOS"
+	default:
+		return ""
+	}
+}
+
 type PidPraseOut interface {
 	GetPodUid() (string, error)
 	GetDockerUid() (string, error)

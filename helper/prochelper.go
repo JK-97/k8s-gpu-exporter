@@ -20,7 +20,6 @@ import (
 // docker proc /system.slice/docker-293f758723d0652a0b9fa869106e600079e56dae362ca84de12942d38524a272.scope
 // native proc /
 // centos
-///kubepods/besteffort/pod762f2fe7-8a9d-450a-81e7-88094fc057d0/557a3158f637c3021ecba8450ee945570bdb66876922afafa5dd6e0b35131f71
 // k8s proc  /kubepods/pod8a0412cb-ae87-4bd5-b49d-690fd86f942e/6497d9f440dad7c3d432100ab3c5e895831549467d81eeef176bdec12da43fd9
 // docker proc /docker/04807c588b00fbf639c1e4896eab5a076771b6905b60f9ccc56bf6984ba9b71a
 // native proc /
@@ -93,63 +92,94 @@ func NewPhelper(pid uint, opt PhelperOpts) *Phelper {
 	}
 }
 
+func praseDockerSlice(procInfo, regx string) (string, error) {
+	reDocker, err := regexp.Compile(regx)
+	if err != nil {
+		return "", err
+	}
+	reDockerOut := reDocker.FindStringSubmatch(procInfo)
+	if len(reDockerOut) != 2 {
+		return "", fmt.Errorf("Prase docker  error: %s ,but out %v", procInfo, reDockerOut)
+	}
+	return reDockerOut[1], nil
+}
+
+func praseK8sSlice(procInfo, regx string) (string, error) {
+	reDocker, err := regexp.Compile(regx)
+	if err != nil {
+		return "", err
+	}
+	reK8sOut := reDocker.FindStringSubmatch(procInfo)
+	if len(reK8sOut) != 2 {
+		return "", fmt.Errorf("Prase docker  error: %s ,but out %v", procInfo, reK8sOut)
+	}
+	replaceOut := strings.ReplaceAll(reK8sOut[1], "_", "-")
+	return replaceOut, nil
+}
+
+func insertRegexString(dockerRegexString, k8sRegexString string) ProcPraseFunc {
+	return func(procInfo string) (PidPraseOut, error) {
+		if strings.Contains(string(procInfo), "docker") && !strings.HasPrefix(procInfo, "/kubepods") {
+			out := new(PidBindDocker)
+			reDockerOut, err := praseDockerSlice(procInfo, dockerRegexString)
+			if err != nil {
+				return nil, err
+			}
+			err = out.SetDockerUid(reDockerOut)
+			if err != nil {
+				return nil, err
+			}
+			return out, nil
+
+		}
+		if strings.HasPrefix(procInfo, "/kubepods") {
+			out := new(PidBindK8sPod)
+
+			reDockerOut, err := praseDockerSlice(procInfo, dockerRegexString)
+			if err != nil {
+				return nil, err
+			}
+			err = out.SetDockerUid(reDockerOut)
+			if err != nil {
+				return nil, err
+			}
+
+			reK8sOut, err := praseK8sSlice(procInfo, k8sRegexString)
+			if err != nil {
+				return nil, err
+			}
+			err = out.SetPodUid(reK8sOut)
+			if err != nil {
+				return nil, err
+			}
+
+			return out, nil
+		}
+
+		return nil, errors.New("Prase error : Unknow Proc Type")
+	}
+}
+
+func ubuntuProcPraser(procInfo string) (PidPraseOut, error) {
+	return insertRegexString("docker-(.*).scope", ".*pod(.*).slice/docker")(procInfo)
+}
+func centosProcPraser(procInfo string) (PidPraseOut, error) {
+	return insertRegexString(".*/(.*)", ".*pod(.*)/")(procInfo)
+}
+
 func DefaultProcPraserFunc(procInfo string) (PidPraseOut, error) {
 	if procInfo == "/" {
 		return nil, errors.New("cat not prase native pid")
 	}
-
-	if strings.Contains(string(procInfo), "docker") && !strings.HasPrefix(procInfo, "/kubepods") {
-		out := new(PidBindDocker)
-		reDocker, err := regexp.Compile("docker-(.*).scope")
-		if err != nil {
-			return nil, err
-		}
-		reDockerOut := reDocker.FindStringSubmatch(procInfo)
-		if len(reDockerOut) != 2 {
-			return nil, fmt.Errorf("Prase docker  error: %s ,but out %v", procInfo, reDockerOut)
-		}
-
-		err = out.SetDockerUid(reDockerOut[1])
-		if err != nil {
-			return nil, err
-		}
-		return out, nil
-
+	switch relese, err := GetHostRelease(); relese {
+	case UBUNTU:
+		return ubuntuProcPraser(procInfo)
+	case CENTOS:
+		return centosProcPraser(procInfo)
+	case UNKNOW:
+		return nil, err
 	}
-	if strings.HasPrefix(procInfo, "/kubepods") {
-		out := new(PidBindK8sPod)
-
-		reDocker, err := regexp.Compile("docker-(.*).scope")
-		if err != nil {
-			return nil, err
-		}
-		reDockerOut := reDocker.FindStringSubmatch(procInfo)
-		if len(reDockerOut) != 2 {
-			return nil, fmt.Errorf("Prase docker  error: %s ,but out %v", procInfo, reDockerOut)
-		}
-		err = out.SetDockerUid(reDockerOut[1])
-		if err != nil {
-			return nil, err
-		}
-
-		reK8s, err := regexp.Compile(".*pod(.*).slice/docker")
-		if err != nil {
-			return nil, err
-		}
-		reK8sOut := reK8s.FindStringSubmatch(procInfo)
-		if len(reDockerOut) != 2 {
-			return nil, fmt.Errorf("Prase k8s  error: %s ,but out %v", procInfo, reK8sOut)
-		}
-		replaceOut := strings.ReplaceAll(reK8sOut[1], "_", "-")
-		err = out.SetPodUid(replaceOut)
-		if err != nil {
-			return nil, err
-		}
-
-		return out, nil
-	}
-
-	return nil, errors.New("Prase error : Unknow Proc Type")
+	return nil, nil
 }
 
 func (p *Phelper) PraseProc() (PidPraseOut, error) {
@@ -173,18 +203,18 @@ var _ ProcHelper = new(Phelper)
 // CHelper Get container or pod information
 type CHelper struct {
 	ContainerHelper
-	KClient  *kubernetes.Clientset
-	PraseFuc ProcPraseFunc
+	KClient   *kubernetes.Clientset
+	PraseFunc ProcPraseFunc
 }
 type CHelperOps struct {
-	KClient  *kubernetes.Clientset
-	PraseFuc ProcPraseFunc
+	KClient   *kubernetes.Clientset
+	PraseFunc ProcPraseFunc
 }
 
 func NewCHepler(ops *CHelperOps) *CHelper {
 	return &CHelper{
-		KClient:  ops.KClient,
-		PraseFuc: ops.PraseFuc,
+		KClient:   ops.KClient,
+		PraseFunc: ops.PraseFunc,
 	}
 }
 
@@ -213,7 +243,7 @@ func (c *CHelper) GetK8sPods(processesInfo []*nvml.ProcessInfo) ([]*PodGPUInfo, 
 	}
 	res := make([]*PodGPUInfo, 0)
 	for _, pi := range processesInfo {
-		ph := NewPhelper(pi.Pid, PhelperOpts{PraseFunc: c.PraseFuc})
+		ph := NewPhelper(pi.Pid, PhelperOpts{PraseFunc: c.PraseFunc})
 		out, err := ph.PraseProc()
 		if err != nil {
 			return nil, err
@@ -246,3 +276,21 @@ func (c *CHelper) GetContainers(processInfo []*nvml.ProcessInfo) ([]*types.Conta
 
 // check interface impelement
 var _ ContainerHelper = new(CHelper)
+
+const ProcVersionPath string = "/proc/version"
+
+var ReleaseUnkonwErr = errors.New("Unkonw linux release")
+
+func GetHostRelease() (Release, error) {
+	data, err := ioutil.ReadFile(ProcVersionPath)
+	if err != nil {
+		return UNKNOW, err
+	}
+	lowerData := strings.ToLower(string(data))
+	if strings.Contains(lowerData, "ubuntu") {
+		return UBUNTU, nil
+	} else if strings.Contains(lowerData, "centos") {
+		return CENTOS, nil
+	}
+	return UNKNOW, ReleaseUnkonwErr
+}
