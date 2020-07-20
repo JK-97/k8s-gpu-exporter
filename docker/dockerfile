@@ -16,6 +16,5 @@ ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=utility
 EXPOSE 9445
 COPY --from=build-env /build/k8s-gpu-exporter /app/k8s-gpu-exporter
-COPY lib/libnvidia-ml.so /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
 RUN ln -s /app/k8s-gpu-exporter /usr/bin/k8s-gpu-exporter
 CMD ["k8s-gpu-exporter"]
