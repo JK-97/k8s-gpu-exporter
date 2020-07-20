@@ -5,41 +5,22 @@
  - `kubeconfig` : Absolute path to the kubeconfig file, default get config from pod binding ServiceAccount.
 
 ## Docker Build
-Tips :
-By default, after the nvidia-docker container is started, there will be a symbolic link : `/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1` in the container by default, and destination of the symbolic link is a correct version `libnvidia-ml.so`. you can jump to step 4
-
-
-
-If you don't have a correct version `libnvidia-ml.so` in container, you can solve it according to the following steps.
-
-
-1. Find out the `libnvidia-ml.so` on you host which you want run this k8s-gpu-exporter.
+1. Find out the `libnvidia-ml.so` on you host.
     ```shell
     find /usr/ -name libnvidia-ml.so 
     ```
     
 2. Copy the `libnvidia-ml.so` under `project-dir/lib` directory
 
-3. Add line `COPY lib/libnvidia-ml.so /usr/lib/x86_64-linux-gnu/libnvidia-ml.so` in docker/dockerfile, for example:
-    ```
-    ...
-    COPY --from=build-env /build/k8s-gpu-exporter /app/k8s-gpu-exporter
-    COPY lib/libnvidia-ml.so /usr/lib/x86_64-linux-gnu/libnvidia-ml.so
-    ... 
-    ```
-
-4. Run MakeFile
+3. Run MakeFile
     ```shell
-    VERSION={YOU_VERSION} make docker 
+    make docker 
     ```
 
 ## Best Practices
 
 If you already have [Arena](https://github.com/kubeflow/arena), use it to submit a training task.
 ```bash
-# Preparation
-# Label the GPU Node
-$ kubectl lebel node {YOU_NODE}
 # First
 $ kubectl apply -f k8s-gpu-exporter.yaml
 
@@ -49,7 +30,7 @@ $ kubectl apply -f k8s-gpu-exporter.yaml
 # """""""""""""""""""""""""""""""""""
 
 # Third
-# Submit a deeplearn job
+# submit a deeplearn job
 $ arena submit tf --name=style-transfer \
               --gpus=1 \
               --workers=1 \
@@ -70,7 +51,7 @@ $ curl {HOST_IP}:{PORT}/metrics
     ...Omit...
 
 # Fifth
-$ kubectl logs {YOUR_K8S_GPU_EXPORTER_POD}
+$ kubectl logs {your-k8s-gpu-exporter-pod}
     SystemGetDriverVersion: 450.36.06
     Not specify a config ,use default svc
     :9445
@@ -82,10 +63,28 @@ $ kubectl logs {YOUR_K8S_GPU_EXPORTER_POD}
 
 
 
-## Prometheus
-Add Annotation `prometheus.io/scrape: 'true'` to k8s-gpu-exporter pod so that prometheus can automatically discover metrics services
+### Prometheus
+##### Scrape_configs
+Add k8s-gpu-exporter in prometheus auto discover
+```yaml
+  prometheus.yml: |
+    global:
+      scrape_interval:     15s
+      evaluation_interval: 15s
+    scrape_configs:
+    - job_name: 'gpu-pod'
+      kubernetes_sd_configs:
+      - role: service
+      relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_service_label_(k8s-gpu-exporter)
+      - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name]
+        action: keep
+        regex: default;k8s-gpu-exporter
 
-And you can use PromQL query statement `nvidia_gpu_used_memory/nvidia_gpu_total_memory` to see gpu memory usage
+```
+
+And you use PromQL query statement `nvidia_gpu_used_memory/nvidia_gpu_total_memory` to see gpu memory usage
 
 
 ![gpu_memory_usage](.github/image/gpu_memory_usage.png)

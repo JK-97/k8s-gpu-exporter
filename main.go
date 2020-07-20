@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
 	"github.com/JK-97/k8s-gpu-exporter/helper"
 
@@ -23,17 +22,15 @@ import (
 )
 
 var (
-	nvidiaDockerNvmlLink = "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1"
-	nvmlLibLink          = "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so"
-)
-
-var (
 	addr       = flag.String("address", ":9445", "Address to listen on for web interface and telemetry.")
 	kubeconfig = flag.String("kubeconfig", "", "Absolute path to the kubeconfig file, default get config from pod binding ServiceAccount.")
 )
 
 func init() {
-	autoLoadNvml()
+	if err := nvml.Init(); err != nil {
+		fmt.Printf("nvml error: %+v\n", err)
+		panic(err)
+	}
 	err := viper.BindEnv("NODE_NAME")
 	if err != nil {
 		panic(err)
@@ -62,7 +59,7 @@ func main() {
 		panic(err)
 	}
 	cHelper := helper.NewCHepler(&helper.CHelperOps{
-		KClient:   clientset,
+		KClient:  clientset,
 		PraseFunc: helper.DefaultProcPraserFunc,
 	})
 
@@ -77,7 +74,7 @@ func main() {
 
 func GetK8sConfig() (*rest.Config, error) {
 	if *kubeconfig == "" {
-		fmt.Println("Not specify a config ,use default config from k8s env")
+		fmt.Println("Not specify a config ,use default svc")
 		config, err := rest.InClusterConfig()
 		if err != nil {
 			return nil, err
@@ -90,28 +87,4 @@ func GetK8sConfig() (*rest.Config, error) {
 		}
 		return config, nil
 	}
-}
-
-func autoLoadNvml() {
-	_, err := os.Stat(nvidiaDockerNvmlLink)
-	if err != nil {
-		panic(err)
-	} else {
-		dst, err := os.Readlink(nvidiaDockerNvmlLink)
-		if err != nil {
-			panic(err)
-		}
-		_, err = os.Stat(nvmlLibLink)
-		if err == nil {
-			os.Remove(nvmlLibLink)
-		}
-		err = os.Symlink(dst, nvmlLibLink)
-		if err != nil {
-			panic(err)
-		}
-	}
-	if err = nvml.Init(); err != nil {
-		panic(err)
-	}
-
 }
