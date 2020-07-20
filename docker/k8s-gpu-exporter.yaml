@@ -9,22 +9,6 @@ metadata:
 ---
 
 apiVersion: v1
-kind: Service
-metadata:
-  name: k8s-gpu-exporter
-  labels:
-    k8s-app: k8s-gpu-exporter
-spec:
-  ports:
-  - port: 9445
-    targetPort: 9445
-  type: LoadBalancer
-  selector:
-    k8s-app: k8s-gpu-exporter
-
----
-
-apiVersion: v1
 kind: Secret
 metadata:
   labels:
@@ -83,7 +67,9 @@ spec:
   template:
     metadata:
       labels:
-        k8s-app:  k8s-gpu-exporter
+        k8s-app: 'k8s-gpu-exporter'
+      annotations:
+        prometheus.io/scrape: 'true'
     spec:
       serviceAccountName: k8s-gpu-exporter
       affinity:
@@ -113,6 +99,9 @@ spec:
         volumeMounts:
         - name: dockersock
           mountPath: /var/run/docker.sock
+        ports:
+        - containerPort: 9445
+          hostPort: 9445
         # resources:
         #   requests:
         #     memory: 30Mi
