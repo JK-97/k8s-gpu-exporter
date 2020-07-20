@@ -45,11 +45,6 @@ $ kubectl lebel node {YOU_NODE} k8s-node/nvidia_count={GPU_NUM}
 $ kubectl apply -f k8s-gpu-exporter.yaml
 
 # Second
-# """""""""""""""""""""""""""""""""""
-# " Then expose this svc at {PORT}  "
-# """""""""""""""""""""""""""""""""""
-
-# Third
 # Submit a deeplearn job
 $ arena submit tf --name=style-transfer \
               --gpus=1 \
@@ -60,7 +55,7 @@ $ arena submit tf --name=style-transfer \
               --psImage=registry.cn-hangzhou.aliyuncs.com/tensorflow-samples/style-transfer:ps   \
               "python neural_style.py --styles /neural-style/examples/1-style.jpg --iterations 1000"
 
-# Fourth
+# Third
 $ curl {HOST_IP}:{PORT}/metrics
     
     ...Omit...
@@ -70,7 +65,7 @@ $ curl {HOST_IP}:{PORT}/metrics
     nvidia_gpu_used_memory{gpu_node="dev-ms-7c22",gpu_pod_name="style-transfer-worker-0",minor_number="0",name="GeForce GTX 1660 SUPER",namepace_name="default",uuid="GPU-a1460327-d919-1478-a68f-ef4cbb8515ac"} 8.912896e+07
     ...Omit...
 
-# Fifth
+# Fourth
 $ kubectl logs {YOUR_K8S_GPU_EXPORTER_POD}
     SystemGetDriverVersion: 450.36.06
     Not specify a config ,use default svc
