@@ -39,7 +39,8 @@ If you already have [Arena](https://github.com/kubeflow/arena), use it to submit
 ```bash
 # Preparation
 # Label the GPU Node
-$ kubectl lebel node {YOU_NODE}
+$ kubectl lebel node {YOU_NODE} k8s-node/nvidia_count={GPU_NUM}
+
 # First
 $ kubectl apply -f k8s-gpu-exporter.yaml
 
