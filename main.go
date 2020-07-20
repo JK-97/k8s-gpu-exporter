@@ -68,10 +68,10 @@ func main() {
 
 	prometheus.MustRegister(collector.NewCollector(cHelper))
 
-	// Serve on all paths under addr
+	fmt.Println("Handle URL path: /metrics")
+	fmt.Printf("Listen on %v\n", *addr)
+
 	http.Handle("/metrics", promhttp.Handler())
-	fmt.Println(*addr)
-	// collector.K8s()
 	log.Fatalf("ListenAndServe error: %v", http.ListenAndServe(*addr, nil))
 }
 
